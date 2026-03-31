@@ -1,7 +1,7 @@
 import express from "express";
 import { connectDB } from "./db.js";
 import { authRouter } from "./routes/auth.js";
-import { eprofileModel } from "./models/emergency_profile.js";
+import { profileRouter } from "./routes/profile.js";
 
 const app = express();
 app.use(express.json());
@@ -17,4 +17,4 @@ try{
 
 
 app.use("/user",authRouter);
-app.use("/profile",eprofileModel);
+app.use("/profile",profileRouter);
