@@ -107,7 +107,7 @@ authRouter.post("/login",async (req,res) => {
     //JWT Token
     try {
         const token = jwt.sign(
-            {id: password},
+            {id: checkUser._id},
             process.env.JWT_SECRET,
             {expiresIn: "2h"}
         );
