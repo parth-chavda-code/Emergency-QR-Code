@@ -30,9 +30,11 @@ authRouter.post("/signup",async (req,res) => {
     try{
         const saltround = 10;
         const hashedPassword = await bcrypt.hash(password,saltround);
-        await authRouter.create({
+        
+        //DB insertion
+        await userModel.create({
             email: email,
-            password,hashedPassword,
+            password: hashedPassword,
             firstName: firstName,
             lastName: lastName
         });
@@ -43,11 +45,15 @@ authRouter.post("/signup",async (req,res) => {
 
     } catch(err){
         return res.status(404).json({
-            msg: "Error in db insertion"
+            msg: "Error in db insertion",
+            error: err
         });
     }
     
 
 });
-
+//Log in
+authRouter.post("/login",(req,res) => {
+    const {email,password} = req.body;
+});
 export {authRouter};
