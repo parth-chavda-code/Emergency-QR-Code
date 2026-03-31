@@ -1,5 +1,4 @@
 import { Router } from "express";
-import mongoose from "mongoose";
 import { userModel } from "../models/user.js";
 import { z } from "zod";
 import bcrypt from "bcrypt";
