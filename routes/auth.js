@@ -4,6 +4,9 @@ import { userModel } from "../models/user.js";
 import { z } from "zod";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const authRouter = Router();
 
@@ -37,9 +40,7 @@ authRouter.post("/signup",async (req,res) => {
             msg: "User is alreay exist"
         });
     }
-    // if(userFind){
 
-    // }
     //Password hashing
     try{
         const saltround = 10;
@@ -54,7 +55,7 @@ authRouter.post("/signup",async (req,res) => {
         });
 
         res.json({
-            msg: "Work Just OK"
+            msg: "User is registered successfully"
         });
 
     } catch(err){
@@ -67,7 +68,7 @@ authRouter.post("/signup",async (req,res) => {
 
 });
 //Log in
-authRouter.post("/login",(req,res) => {
+authRouter.post("/login",async (req,res) => {
     //Zod Schema
     const schema = z.object({
         email: z.email("Invalid Email"),
@@ -83,12 +84,42 @@ authRouter.post("/login",(req,res) => {
     }
 
     const {email,password} = req.body;
-    //
+    //user registration check
+    const checkUser = await userModel.findOne({
+        email: email
+    });
+
+    if(!checkUser){
+        return res.status(404).json({
+            msg: "User is not registered"
+        });
+    }
+
+    //password checking
+    const hashedPass = checkUser.password;
+    const checkPass = await bcrypt.compare(password,hashedPass);
+    if(!checkPass){
+        return res.status(404).json({
+            msg: "Wrong Password"
+        });
+    }
+
     //JWT Token
     try {
-        
+        const token = jwt.sign(
+            {id: password},
+            process.env.JWT_SECRET,
+            {expiresIn: "2h"}
+        );
+        res.json({
+            msg: "User is Loged in Successfully",
+            token: token
+        });
+
     } catch (err) {
-        
+        res.json({
+            msg: "Login Error"
+        });
     }
 
 
