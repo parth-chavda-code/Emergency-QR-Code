@@ -9,6 +9,8 @@ const user = new Schema({
     lastName: {type: String, required: true}
 });
 
-
 const userModel = mongoose.model("User",user);
-export {userModel};
+
+export {
+    userModel,
+};
