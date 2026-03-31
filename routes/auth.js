@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { userModel } from "../models/user.js";
 import { z } from "zod";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const authRouter = Router();
 
@@ -26,6 +27,19 @@ authRouter.post("/signup",async (req,res) => {
     }
 
     const {email,password,firstName,lastName} = req.body;
+    //find dubplicate user
+    const userFind = await userModel.findOne({
+        email:email
+    });
+
+    if(userFind){
+        return res.status(404).json({
+            msg: "User is alreay exist"
+        });
+    }
+    // if(userFind){
+
+    // }
     //Password hashing
     try{
         const saltround = 10;
@@ -54,6 +68,30 @@ authRouter.post("/signup",async (req,res) => {
 });
 //Log in
 authRouter.post("/login",(req,res) => {
+    //Zod Schema
+    const schema = z.object({
+        email: z.email("Invalid Email"),
+        password: z.string()
+    });
+    //Zod Result
+    const zodRes = schema.safeParse(req.body);
+    if(!zodRes.success){
+        return res.status(404).json({
+            msg: "Invalid Format",
+            zodError: zodRes
+        });
+    }
+
     const {email,password} = req.body;
+    //
+    //JWT Token
+    try {
+        
+    } catch (err) {
+        
+    }
+
+
+
 });
 export {authRouter};
