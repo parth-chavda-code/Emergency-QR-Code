@@ -2,12 +2,12 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { userModel } from "../models/user.js";
 
-const userRouter = Router();
+const authRouter = Router();
 
 //Sign up
-userRouter.post("/signup",(req,res) => {
+authRouter.post("/signup",(req,res) => {
     const {email,password,firstName,lastName} = req.body;
     res.json("IN signup page");
 });
 
-export {userRouter};
+export {authRouter};
