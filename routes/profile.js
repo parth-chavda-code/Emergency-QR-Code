@@ -9,7 +9,7 @@ const profileRouter = Router();
 //Create Emergency Profile
 profileRouter.post("/create",authUser,async(req,res) => {
     const schema = z.object({
-        bloodtype: z.string(),
+        bloodType: z.string(),
         allergies: z.array(z.string()),
         emergencyContact: z.array(z.object({
             phone: z.string(),
@@ -24,7 +24,7 @@ profileRouter.post("/create",authUser,async(req,res) => {
     
     if(!result.success){
         return res.status(404).json({
-            msg: "Error",
+            msg: "Error in emergecny profile zod",
             error: result
         });
     }
@@ -46,7 +46,9 @@ profileRouter.post("/create",authUser,async(req,res) => {
         res.json("Done in profile");
 
     } catch(err){
-        res.json("ERROR : ",err);
+        return res.json({
+            msg: "ERROR in emergency profile create",
+            "ERROR": err});
     }
     
 });
@@ -55,15 +57,15 @@ profileRouter.post("/create",authUser,async(req,res) => {
 profileRouter.put("/update",authUser,async(req,res)=>{
 
     const schema = z.object({
-        bloodType: z.string(),
-        allergies: z.array(z.string()),
+        bloodType: z.string().optional(),
+        allergies: z.array(z.string()).optional(),
         emergencyContact: z.array(z.object({
             phone: z.string(),
             name: z.string(),
             relation: z.string()
-        })),
-        medicalCondition: z.array(z.string()),
-        medications: z.array(z.string()),
+        })).optional(),
+        medicalCondition: z.array(z.string()).optional(),
+        medications: z.array(z.string()).optional(),
     });
 
     const result = schema.safeParse(req.body);
@@ -86,7 +88,4 @@ profileRouter.put("/update",authUser,async(req,res)=>{
         res.json("Error in Updating");
     }
 });
-
-//Emergency QR CODE
-
 export {profileRouter};
