@@ -7,10 +7,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const authRouter = Router();
+const userRouter = Router();
 
 //Sign up
-authRouter.post("/signup",async (req,res) => {
+userRouter.post("/signup",async (req,res) => {
     //Zod schema
     const schema = z.object({
         email: z.email("Invalid email"),
@@ -67,7 +67,7 @@ authRouter.post("/signup",async (req,res) => {
 
 });
 //Log in
-authRouter.post("/login",async (req,res) => {
+userRouter.post("/login",async (req,res) => {
     //Zod Schema
     const schema = z.object({
         email: z.email("Invalid Email"),
@@ -124,4 +124,4 @@ authRouter.post("/login",async (req,res) => {
 
 
 });
-export {authRouter};
+export {userRouter};

@@ -1,13 +1,13 @@
 import express from "express";
 import { connectDB } from "./db.js";
-import { authRouter } from "./routes/auth.js";
+import { userRouter } from "./routes/user.js";
 import { profileRouter } from "./routes/profile.js";
 import { eRouter } from "./routes/emergency.js";
 
 const app = express();
 app.use(express.json());
 
-app.use("/user",authRouter);
+app.use("/user",userRouter);
 app.use("/profile",profileRouter);
 app.use("/emergency",eRouter);
 
