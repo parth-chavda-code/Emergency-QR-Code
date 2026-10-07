@@ -1,16 +1,21 @@
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 
-dotenv.config();
+mongoose.set("bufferCommands", false);
 
-const connectDB = async() => {
-    try{
-        await mongoose.connect(process.env.dbconnection);
-        console.log("DB connection success");
-    }catch(err){
-        console.log("DB not connected Successfully",err);
-        throw err;
-    }
+export async function connectDB(databaseUri) {
+    await mongoose.connect(databaseUri, {
+        serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000,
+        socketTimeoutMS: 10000,
+        autoIndex: false,
+    });
 }
 
-export {connectDB};
+export async function disconnectDB() {
+    await mongoose.disconnect();
+}
+
+// Never log a URI or driver error contents.
+mongoose.connection.on("error", () => {
+    console.error("Database connection error");
+});
