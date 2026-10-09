@@ -1,16 +1,61 @@
 import mongoose from "mongoose";
+import { emailSchema, nameSchema } from "../validation/user.js";
 
-const {Schema} = mongoose;
+export const emailCollation = { locale: "en", strength: 2 };
 
-const user = new Schema({
-    email: {type: String,unique: true,required: true},
-    password: {type: String,required: true},
-    firstName: {type: String,required: true},
-    lastName: {type: String, required: true}
-});
+function hidePassword(doc, value) {
+  delete value.password;
+  delete value.__v;
+  return value;
+}
 
-const userModel = mongoose.model("User",user);
+const userSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      validate: (value) => emailSchema.safeParse(value).success,
+    },
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: (value) => nameSchema.safeParse(value).success,
+    },
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: (value) => nameSchema.safeParse(value).success,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+      // Accept the stored bcrypt format, never a plain password.
+      match: /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/,
+    },
+  },
+  {
+    autoIndex: true,
+    bufferCommands: false,
+    strict: "throw",
+    timestamps: { createdAt: true, updatedAt: false },
+    toJSON: { transform: hidePassword },
+    toObject: { transform: hidePassword },
+  },
+);
 
-export {
-    userModel,
-};
+// Also prevent case variants from duplicating an email stored by older code.
+userSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    collation: emailCollation,
+    name: "email_unique_case_insensitive",
+  },
+);
+
+export const userModel = mongoose.model("User", userSchema);
