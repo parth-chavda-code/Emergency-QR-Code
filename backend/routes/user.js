@@ -1,8 +1,13 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { rateLimit } from "express-rate-limit";
 import { userModel, emailCollation } from "../models/user.js";
-import { signupSchema } from "../validation/user.js";
+import { signupSchema, loginSchema } from "../validation/user.js";
+
+// A comparison for unknown emails helps reduce password-check timing differences.
+const dummyPasswordHash =
+  "$2b$10$Ok0Lv.4XISvcDf4EQuFD4.nXiUClcpu6T4qSvuBlqus2P4s2SPZ0W";
 
 const fieldMessages = {
   email: "A valid email address is required (maximum 254 characters)",
@@ -23,13 +28,14 @@ const databaseFailures = new Set([
   "MongoOperationTimeoutError",
 ]);
 
-function unavailable(res) {
+function unavailable(res, action = "Signup") {
   return res
     .set("Retry-After", "5")
     .status(503)
-    .json({ error: "Signup temporarily unavailable. Please try again later." });
+    .json({
+      error: `${action} temporarily unavailable. Please try again later.`,
+    });
 }
-
 export function createUserRouter() {
   const router = Router();
   // Each app instance owns its limiter. No proxy headers are trusted by default.
@@ -42,7 +48,16 @@ export function createUserRouter() {
     validate: { xForwardedForHeader: false },
     message: { error: "Too many signup attempts. Please try again later." },
   });
+  const loginLimit = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
+    message: { error: "Too many login attempts. Please try again later." },
+  });
 
+  //signup
   router.post("/signup", signupLimit, async (req, res, next) => {
     res.set("Cache-Control", "no-store");
     if (!req.is("application/json")) {
@@ -111,6 +126,73 @@ export function createUserRouter() {
         userModel.db.readyState !== 1
       ) {
         return unavailable(res);
+      }
+      return next(err);
+    }
+  });
+
+  //login
+  router.post("/login", loginLimit, async (req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    if (!req.is("application/json")) {
+      return res
+        .status(415)
+        .json({ error: "Content-Type must be application/json" });
+    }
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid login data" });
+    }
+    if (userModel.db.readyState !== 1) return unavailable(res, "Login");
+
+    const { email, password } = parsed.data;
+    try {
+      const user = await userModel
+        .findOne({ email })
+        .collation(emailCollation)
+        .select("+password")
+        .maxTimeMS(5000);
+
+      //checks that the db has bcrypt hashed password or not
+      const hasBcryptPassword =
+        typeof user?.password === "string" &&
+        userModel.schema.path("password").options.match.test(user.password);
+
+      //compares the hashed password
+      const matches = await bcrypt.compare(
+        password,
+        hasBcryptPassword ? user.password : dummyPasswordHash, //search timing side channel for dummyPasswordHash
+      );
+      if (!user || !hasBcryptPassword || !matches) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+
+      const token = jwt.sign({}, req.app.locals.jwtSecret, {
+        algorithm: "HS256",
+        subject: user._id.toString(),
+        issuer: "emergency-qr-code",
+        audience: "emergency-qr-api",
+        expiresIn: "15m",
+      });
+      return res.status(200).json({
+        token,
+        tokenType: "Bearer",
+        expiresIn: 900,
+        user: {
+          id: user._id.toString(),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          createdAt: user.createdAt,
+        },
+      });
+    } catch (err) {
+      if (
+        databaseFailures.has(err.name) ||
+        err.code === 50 ||
+        userModel.db.readyState !== 1
+      ) {
+        return unavailable(res, "Login");
       }
       return next(err);
     }
