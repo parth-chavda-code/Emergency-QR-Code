@@ -24,16 +24,19 @@ export const nameSchema = z
     "Name must not contain control characters",
   );
 
-const passwordSchema = z
+export const loginPasswordSchema = z
   .string()
-  .refine(
-    (value) => [...value].length >= 15,
-    "Password must have at least 15 characters",
-  )
+  .min(1, "Password is required")
   .refine(
     // bcrypt only uses the first 72 bytes. Reject longer input instead of cutting it off.
     (value) => Buffer.byteLength(value, "utf8") <= 72,
     "Password must use at most 72 bytes",
+  );
+
+const passwordSchema = loginPasswordSchema
+  .refine(
+    (value) => [...value].length >= 15,
+    "Password must have at least 15 characters",
   )
   .refine((value) => /\S/u.test(value), "Password must not be only whitespace");
 
@@ -43,4 +46,9 @@ export const signupSchema = z.strictObject({
   firstName: nameSchema,
   lastName: nameSchema,
   password: passwordSchema,
+});
+
+export const loginSchema = z.strictObject({
+  email: emailSchema,
+  password: loginPasswordSchema,
 });
