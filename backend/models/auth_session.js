@@ -9,6 +9,10 @@ const sessionSchema = new Schema(
       required: true,
       immutable: true,
     },
+    loginVersion: {
+      type: Number, required: true, default: 0, min: 0,
+      validate: Number.isSafeInteger, immutable: true,
+    },
     expiresAt: { type: Date, required: true },
     revokedAt: { type: Date, default: null },
   },
@@ -21,7 +25,7 @@ const sessionSchema = new Schema(
   },
 );
 sessionSchema.index({ userId: 1, revokedAt: 1 });
-// Cleanup is delayed; future middleware must check expiresAt itself.
+// Cleanup is delayed; middleware must check expiresAt itself.
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const authSessionModel = mongoose.model("AuthSession", sessionSchema);
