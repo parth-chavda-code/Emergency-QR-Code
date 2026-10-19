@@ -5,6 +5,7 @@ export const emailCollation = { locale: "en", strength: 2 };
 
 function hidePassword(doc, value) {
   delete value.password;
+  delete value.loginVersion;
   delete value.__v;
   return value;
 }
@@ -36,6 +37,15 @@ const userSchema = new mongoose.Schema(
       select: false,
       // Accept the stored bcrypt format, never a plain password.
       match: /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/,
+    },
+    // Logout increases this number, invalidating every older login session.
+    loginVersion: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+      validate: Number.isSafeInteger,
+      select: false,
     },
   },
   {
