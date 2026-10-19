@@ -49,20 +49,61 @@ const contactSchema = z.strictObject({
   relation: nameSchema.optional(),
 });
 
-export const profileSchema = z.strictObject({
-  displayName: nameSchema,
-  dob: z
-    .string()
-    .refine(
-      (value) => isValidDob(value),
-      "DOB must be a valid non-future date (YYYY-MM-DD)",
-    ),
-  bloodType: z
-    .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
-    .optional(),
-  allergies: medicalList,
-  medicalCondition: medicalList,
-  medications: medicalList,
-  emergencyContact: z.array(contactSchema).max(5).default([]),
-  sharingConsent: consentSchema.default(() => consentSchema.parse({})),
-});
+export const profileSchema = z
+  .strictObject({
+    displayName: nameSchema,
+    dob: z
+      .string()
+      .refine(
+        (value) => isValidDob(value),
+        "DOB must be a valid non-future date (YYYY-MM-DD)",
+      ),
+    bloodType: z
+      .enum(["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"])
+      .optional(),
+    allergies: medicalList,
+    medicalCondition: medicalList,
+    medications: medicalList,
+    emergencyContact: z.array(contactSchema).max(5).default([]),
+    sharingConsent: consentSchema.default(() => consentSchema.parse({})),
+  })
+  .refine(
+    ({ sharingConsent, ...data }) =>
+      Buffer.byteLength(JSON.stringify(data), "utf8") <= 64000,
+    "Profile contents must use at most 64000 bytes",
+  );
+
+// Update fields must have no creation defaults: omission means "keep the current value".
+export const profileUpdateSchema = z
+  .strictObject({
+    revision: z
+      .number()
+      .int()
+      .min(1)
+      .max(Number.MAX_SAFE_INTEGER - 1),
+    displayName: profileSchema.shape.displayName.optional(),
+    dob: profileSchema.shape.dob.optional(),
+    bloodType: profileSchema.shape.bloodType.nullable(),
+    allergies: medicalList.unwrap().optional(),
+    medicalCondition: medicalList.unwrap().optional(),
+    medications: medicalList.unwrap().optional(),
+    emergencyContact: z.array(contactSchema).max(5).optional(),
+    sharingConsent: z
+      .strictObject(
+        Object.fromEntries(
+          sharingCategories.map((category) => [
+            category,
+            z.boolean().optional(),
+          ]),
+        ),
+      )
+      .refine(
+        (value) => Object.keys(value).length > 0,
+        "Provide a consent change",
+      )
+      .optional(),
+  })
+  .refine(
+    ({ revision, ...changes }) => Object.keys(changes).length > 0,
+    "Provide at least one profile change",
+  );
