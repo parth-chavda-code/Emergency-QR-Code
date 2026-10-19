@@ -1,9 +1,15 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
 import { rateLimit } from "express-rate-limit";
 import { userModel, emailCollation } from "../models/user.js";
 import { signupSchema, loginSchema } from "../validation/user.js";
+import { authUser } from "../middlewares/authMiddleware.js";
+import {
+  createLoginSession,
+  logoutEverywhere,
+  recordAuthEvent,
+  isDatabaseFailure,
+} from "../security/authSessions.js";
 
 // A comparison for unknown emails helps reduce password-check timing differences.
 const dummyPasswordHash =
@@ -18,15 +24,6 @@ const fieldMessages = {
   password:
     "Password must have at least 15 characters, use at most 72 bytes, and not be only whitespace",
 };
-const databaseFailures = new Set([
-  "MongooseServerSelectionError",
-  "MongoServerSelectionError",
-  "MongoNetworkError",
-  "MongoNetworkTimeoutError",
-  "MongoTopologyClosedError",
-  "MongoNotConnectedError",
-  "MongoOperationTimeoutError",
-]);
 
 function unavailable(res, action = "Signup") {
   return res
@@ -120,11 +117,7 @@ export function createUserRouter() {
       if (err.code === 11000) {
         return res.status(409).json({ error: "Email is already registered" });
       }
-      if (
-        databaseFailures.has(err.name) ||
-        err.code === 50 ||
-        userModel.db.readyState !== 1
-      ) {
+      if (isDatabaseFailure(err)) {
         return unavailable(res);
       }
       return next(err);
@@ -150,7 +143,7 @@ export function createUserRouter() {
       const user = await userModel
         .findOne({ email })
         .collation(emailCollation)
-        .select("+password")
+        .select("+password +loginVersion")
         .maxTimeMS(5000);
 
       //checks that the db has bcrypt hashed password or not
@@ -167,13 +160,12 @@ export function createUserRouter() {
         return res.status(401).json({ error: "Invalid email or password" });
       }
 
-      const token = jwt.sign({}, req.app.locals.jwtSecret, {
-        algorithm: "HS256",
-        subject: user._id.toString(),
-        issuer: "emergency-qr-code",
-        audience: "emergency-qr-api",
-        expiresIn: "15m",
-      });
+      const token = await createLoginSession(user, req.app.locals.jwtSecret);
+      if (!token)
+        return res
+          .status(401)
+          .json({ error: "Login session changed. Please log in again." });
+      await recordAuthEvent("auth.login", user._id);
       return res.status(200).json({
         token,
         tokenType: "Bearer",
@@ -187,13 +179,26 @@ export function createUserRouter() {
         },
       });
     } catch (err) {
-      if (
-        databaseFailures.has(err.name) ||
-        err.code === 50 ||
-        userModel.db.readyState !== 1
-      ) {
+      if (isDatabaseFailure(err)) {
         return unavailable(res, "Login");
       }
+      return next(err);
+    }
+  });
+
+  // No body is needed. The verified session identifies the account to sign out.
+  router.post("/logout", authUser, async (req, res, next) => {
+    try {
+      if (!(await logoutEverywhere(req.userId, req.loginVersion))) {
+        return res
+          .set("WWW-Authenticate", "Bearer")
+          .status(401)
+          .json({ error: "Invalid or expired authentication token" });
+      }
+      await recordAuthEvent("auth.logout", req.userId);
+      return res.status(204).end();
+    } catch (err) {
+      if (isDatabaseFailure(err)) return unavailable(res, "Logout");
       return next(err);
     }
   });
