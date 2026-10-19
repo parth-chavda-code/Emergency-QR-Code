@@ -23,17 +23,16 @@ export function isDatabaseFailure(error) {
 }
 
 function loginVersion(value) {
-  // Existing accounts have no version field and start at zero.
-  const version = value ?? 0;
+  const version = value;
   if (!Number.isSafeInteger(version) || version < 0)
     throw new Error("Invalid account login version");
   return version;
 }
 
 export async function createLoginSession(user, secret) {
-  const sessionId = new mongoose.Types.ObjectId();
+  const sessionId = new mongoose.Types.ObjectId(); //generates mongoDb object id
   const issuedAt = Math.floor(Date.now() / 1000);
-  const expiresAt = issuedAt + 900;
+  const expiresAt = issuedAt + 900; // 15 min
   // Sign before saving: signing failure must not leave an unused session.
   const token = jwt.sign(
     { sid: sessionId.toString(), iat: issuedAt, exp: expiresAt },
@@ -89,10 +88,7 @@ export async function logoutEverywhere(userId, currentVersion) {
     {
       _id: userId,
       // The comparison prevents two overlapping logouts from invalidating a fresh login.
-      $or: [
-        { loginVersion: version },
-        ...(version === 0 ? [{ loginVersion: { $exists: false } }] : []),
-      ],
+      loginVersion: version,
     },
     { $inc: { loginVersion: 1 } },
     { maxTimeMS: 5000 },
