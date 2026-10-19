@@ -1,91 +1,113 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { eprofileModel } from "../models/emergency_profile.js";
+import { auditEventModel } from "../models/audit_event.js";
 import { authUser } from "../middlewares/authMiddleware.js";
-import { v4 as uuidv4 } from 'uuid';
-import {z} from "zod";
+import { isDatabaseFailure } from "../security/authSessions.js";
+import { profileSchema, profileUpdateSchema } from "../validation/profile.js";
+import { prepareProfileStorage, readPrivateProfile } from "../security/profileStorage.js";
 
 const profileRouter = Router();
 
-//Create Emergency Profile
-profileRouter.post("/create",authUser,async(req,res) => {
-    const schema = z.object({
-        bloodType: z.string(),
-        allergies: z.array(z.string()),
-        emergencyContact: z.array(z.object({
-            phone: z.string(),
-            name: z.string(),
-            relation: z.string()
-        })),
-        medicalCondition: z.array(z.string()),
-        medications: z.array(z.string()),
-    });
+function ownerResponse(profile, key) {
+  return { profile: {
+    id: profile._id.toString(),
+    ...readPrivateProfile(profile, key),
+    revision: profile.revision,
+    createdAt: profile.createdAt,
+    updatedAt: profile.updatedAt,
+  } };
+}
 
-    const result = schema.safeParse(req.body);
-    
-    if(!result.success){
-        return res.status(404).json({
-            msg: "Error in emergecny profile zod",
-            error: result
-        });
+function profileFailure(err, res, next) {
+  if (isDatabaseFailure(err)) {
+    return res.set("Retry-After", "5").status(503)
+      .json({ error: "Profile temporarily unavailable. Please try again later." });
+  }
+  return next(err);
+}
+
+async function recordProfileEvent(action, userId, profileId) {
+  try {
+    await auditEventModel.create({ action, actorUserId: userId, profileId });
+  } catch {
+    // A saved edit remains successful even if its audit write fails.
+    console.warn("Profile audit write failed");
+  }
+}
+
+profileRouter.post("/", authUser, async (req, res, next) => {
+  if (!req.is("application/json")) {
+    return res.status(415).json({ error: "Content-Type must be application/json" });
+  }
+  const parsed = profileSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid profile data" });
+
+  try {
+    if (await eprofileModel.exists({ userId: req.userId }).maxTimeMS(5000)) {
+      return res.status(409).json({ error: "Profile already exists" });
     }
-
-    const {bloodType,allergies,emergencyContact,medicalCondition,medications} = req.body;
-    const userId = req.userId;
-    const qrcodeToken = uuidv4();//random string , doesn't repreat
-
-    try{
-        await eprofileModel.create({
-            userId: userId,
-            bloodType: bloodType,
-            allergies: allergies,
-            emergencyContact: emergencyContact,
-            medicalCondition: medicalCondition,
-            medications: medications,
-            qrcodeToken: qrcodeToken
-        });
-        res.json("Done in profile");
-
-    } catch(err){
-        return res.json({
-            msg: "ERROR in emergency profile create",
-            "ERROR": err});
-    }
-    
+    const _id = new mongoose.Types.ObjectId();
+    const stored = prepareProfileStorage(_id, parsed.data, req.app.locals.profileEncryptionKey);
+    const profile = await eprofileModel.create({ _id, userId: req.userId, ...stored });
+    const response = ownerResponse(profile.toObject(), req.app.locals.profileEncryptionKey);
+    await recordProfileEvent("profile.created", req.userId, _id);
+    return res.status(201).json(response);
+  } catch (err) {
+    // The unique ownership index also handles simultaneous creation attempts.
+    if (err.code === 11000) return res.status(409).json({ error: "Profile already exists" });
+    return profileFailure(err, res, next);
+  }
 });
 
-//Emergency Profile Update
-profileRouter.put("/update",authUser,async(req,res)=>{
-
-    const schema = z.object({
-        bloodType: z.string().optional(),
-        allergies: z.array(z.string()).optional(),
-        emergencyContact: z.array(z.object({
-            phone: z.string(),
-            name: z.string(),
-            relation: z.string()
-        })).optional(),
-        medicalCondition: z.array(z.string()).optional(),
-        medications: z.array(z.string()).optional(),
-    });
-
-    const result = schema.safeParse(req.body);
-    if(!result.success){
-        return res.json("Error in profile update zod");
-    }
-
-    const uid = req.userId;
-    const {bloodType,allergies,emergencyContact,medicalCondition,medications} = req.body
-
-    try {
-        await eprofileModel.findOneAndUpdate(
-            { userId: uid },
-            {  bloodType,allergies,emergencyContact,medicalCondition,medications }
-        );
-        
-        res.json("Update Done");
-
-    } catch (err) {
-        res.json("Error in Updating");
-    }
+profileRouter.get("/", authUser, async (req, res, next) => {
+  try {
+    const profile = await eprofileModel.findOne({ userId: req.userId })
+      .select("+privatePayload").maxTimeMS(5000).lean();
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    return res.status(200).json(ownerResponse(profile, req.app.locals.profileEncryptionKey));
+  } catch (err) {
+    return profileFailure(err, res, next);
+  }
 });
-export {profileRouter};
+
+profileRouter.patch("/", authUser, async (req, res, next) => {
+  if (!req.is("application/json")) {
+    return res.status(415).json({ error: "Content-Type must be application/json" });
+  }
+  const parsed = profileUpdateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "Invalid profile update" });
+
+  try {
+    const profile = await eprofileModel.findOne({ userId: req.userId })
+      .select("+privatePayload").maxTimeMS(5000).lean();
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    const { revision, sharingConsent, ...changes } = parsed.data;
+    if (profile.revision !== revision) {
+      return res.status(409).json({ error: "Profile changed. Reload it before editing." });
+    }
+    const current = readPrivateProfile(profile, req.app.locals.profileEncryptionKey);
+    const merged = { ...current, ...changes,
+      sharingConsent: { ...current.sharingConsent, ...sharingConsent } };
+    // null explicitly clears optional blood type; omitted blood type is preserved.
+    if (merged.bloodType === null) delete merged.bloodType;
+    const validated = profileSchema.safeParse(merged);
+    if (!validated.success) return res.status(400).json({ error: "Invalid profile update" });
+
+    const stored = prepareProfileStorage(profile._id, validated.data, req.app.locals.profileEncryptionKey);
+    // One conditional write changes both payloads, consent, and revision together.
+    const updated = await eprofileModel.findOneAndUpdate({
+      _id: profile._id, userId: req.userId, revision,
+    }, { $set: stored, $inc: { revision: 1 } }, {
+      returnDocument: "after", runValidators: true, maxTimeMS: 5000,
+    }).select("+privatePayload").lean();
+    if (!updated) return res.status(409).json({ error: "Profile changed. Reload it before editing." });
+    const response = ownerResponse(updated, req.app.locals.profileEncryptionKey);
+    await recordProfileEvent("profile.updated", req.userId, profile._id);
+    return res.status(200).json(response);
+  } catch (err) {
+    return profileFailure(err, res, next);
+  }
+});
+
+export { profileRouter };
