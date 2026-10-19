@@ -51,6 +51,12 @@ export function prepareProfileStorage(profileId, input, key) {
   };
 }
 
+// Owner-only read: validates decrypted contents before an explicit response is built.
+export function readPrivateProfile(profile, key) {
+  const privateData = decryptJson(profile.privatePayload, key, profileContext(profile._id, "private"));
+  return profileSchema.parse({ ...privateData, sharingConsent: profile.sharingConsent });
+}
+
 export function readPublicSnapshot(profile, key, today = new Date()) {
   const publicData = decryptJson(
     profile.publicSnapshot,
