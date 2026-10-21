@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #b61722;
+  --color-primary-hover: #96121b;
+  --color-ink: #0b1c30;
+  --color-secondary: #536077;
+  --color-wash: #f0f4ff;
+  --color-panel: #e5edff;
+  --color-line: #dbe3f1;
+  --color-success: #006947;
+  --color-error: #a31621;
+  --font-heading: "Space Grotesk", "Arial", sans-serif;
+  --font-sans: "Atkinson Hyperlegible Next", "Segoe UI", sans-serif;
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-hyperlegible-next-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@layer base {
+  body { @apply m-0 bg-[#f8f9ff] font-sans text-ink antialiased; }
+  button, a, input { -webkit-tap-highlight-color: transparent; }
+  button:not(:disabled), a { cursor: pointer; }
+  :focus-visible { outline: 3px solid #006947; outline-offset: 4px; }
+  input:disabled { opacity: 0.65; }
+  ::selection { background: #dae2fd; color: #0b1c30; }
+}
+
+@layer components {
+  .eyebrow { @apply font-heading text-[10px] leading-4 font-bold tracking-[0.09em] uppercase; }
+  .field-label { @apply font-heading text-xs leading-5 font-bold tracking-[0.04em] uppercase; }
+  .auth-card { @apply overflow-hidden border border-line/80 bg-white shadow-[0_12px_32px_-16px_rgba(11,28,48,0.25)]; }
+  .status-strip { @apply flex items-center justify-between gap-2 bg-panel px-5 py-2 font-heading text-[10px] font-bold tracking-wider text-secondary; }
+  .form-input { @apply min-h-12 w-full rounded-none border border-transparent bg-wash px-4 py-3 text-base leading-6 text-ink placeholder:text-secondary/85; }
+  .form-input:focus { @apply border-success bg-white; outline: 2px solid #006947; outline-offset: 1px; }
+  .form-input[aria-invalid="true"] { @apply border-error bg-red-50; }
+  .primary-button { @apply flex min-h-12 w-full items-center justify-center gap-3 bg-primary px-5 py-3.5 font-heading text-sm font-bold tracking-wide text-white uppercase transition-colors hover:bg-primary-hover disabled:cursor-wait disabled:opacity-70; }
+  .text-link { @apply inline-flex min-h-6 items-center gap-1 font-heading text-xs font-bold text-primary underline-offset-4 hover:underline; }
+  .form-alert { @apply border-l-3 border-error bg-red-50 p-4 text-sm leading-6 text-error; }
+  .skip-link { @apply sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-white focus:p-4 focus:text-ink; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
