@@ -1,14 +1,17 @@
+import { profilePayload, readProfileResponse } from "./profileForm.js";
+
 export class ApiError extends Error {
-  constructor(message, fields = {}) {
+  constructor(message, fields = {}, status = 0) {
     super(message);
     this.fields = fields;
+    this.status = status;
   }
 }
 
 async function post(path, body) {
   let response;
   try {
-    response = await fetch(`/api/user/${path}`, {
+    response = await fetch(`/user/${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -49,4 +52,56 @@ export function signup({ firstName, lastName, email, password }) {
 
 export function login({ email, password }) {
   return post("login", { email: email.trim().toLowerCase(), password });
+}
+
+async function authenticatedRequest(path, token, { method = "GET", body, signal } = {}) {
+  const encodedBody = body === undefined ? undefined : JSON.stringify(body);
+  if (encodedBody && new TextEncoder().encode(encodedBody).length > 16 * 1024) {
+    throw new ApiError("This change is too large to send. Shorten some entries or save fewer changes at a time.", {}, 413);
+  }
+  let response;
+  try {
+    response = await fetch(`/user/${path}`, {
+      method, headers: { Authorization: `Bearer ${token}`,
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+      ...(encodedBody !== undefined ? { body: encodedBody } : {}),
+      credentials: "omit", cache: "no-store",
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
+    });
+  } catch {
+    throw new ApiError(method === "GET" ? "We couldn't load your profile. Please try again."
+      : "We couldn't confirm the request. Your changes are still on this page. Check the saved version before trying again.");
+  }
+  if (response.status === 401) throw new ApiError("Your session has ended. Please sign in again.", {}, 401);
+  if (response.status === 404 && path === "profile" && method === "GET") return null;
+  if (response.status === 409) throw new ApiError("The saved profile changed. Review the latest saved version before saving again.", {}, 409);
+  if (response.status === 400) throw new ApiError("Please check your profile details and try again.", {}, 400);
+  if (response.status === 413) throw new ApiError("This change is too large to send. Shorten some entries or save fewer changes at a time.", {}, 413);
+  if (response.status === 429) throw new ApiError("Too many requests. Please wait before trying again.", {}, 429);
+  if (!response.ok) throw new ApiError("The service is temporarily unavailable. Please try again shortly.", {}, response.status);
+  if (path === "logout") {
+    if (response.status !== 204) throw new ApiError("We couldn't confirm sign-out. Please try again.");
+    return;
+  }
+  try { return readProfileResponse(await response.json()); }
+  catch { throw new ApiError("We couldn't read the saved profile. Your draft is unchanged. Please check the saved version."); }
+}
+
+export function getProfile(token, signal) {
+  return authenticatedRequest("profile", token, { signal });
+}
+
+export function createProfile(token, form) {
+  return authenticatedRequest("profile", token, { method: "POST", body: profilePayload(form) });
+}
+
+export function updateProfile(token, changes) {
+  // The request is prepared by profileChanges; no account or profile ID is accepted.
+  const allowed = ["revision", "displayName", "dob", "bloodType", "allergies", "medicalCondition", "medications", "additionalInformation", "emergencyContact", "sharingConsent"];
+  return authenticatedRequest("profile", token, { method: "PATCH",
+    body: Object.fromEntries(allowed.filter(key => Object.hasOwn(changes, key)).map(key => [key, changes[key]])) });
+}
+
+export function logoutEverywhere(token) {
+  return authenticatedRequest("logout", token, { method: "POST" });
 }
