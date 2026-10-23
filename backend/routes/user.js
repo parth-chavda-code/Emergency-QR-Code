@@ -22,7 +22,7 @@ const fieldMessages = {
   lastName:
     "Last name is required and must be 1–100 characters without control characters",
   password:
-    "Password must have at least 15 characters, use at most 72 bytes, and not be only whitespace",
+    "Password must have at least 10 characters, include an uppercase letter, a lowercase letter, and a special character, and use at most 72 bytes",
 };
 
 function unavailable(res, action = "Signup") {
@@ -41,7 +41,7 @@ export function createUserRouter() {
     limit: 20,
     standardHeaders: "draft-8",
     legacyHeaders: false,
-    // Forwarded headers are intentionally ignored until a trusted proxy is configured.
+    // Only the app's explicitly configured upstream proxy can supply client IPs.
     validate: { xForwardedForHeader: false },
     message: { error: "Too many signup attempts. Please try again later." },
   });
