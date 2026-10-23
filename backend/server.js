@@ -1,10 +1,13 @@
 import http from "node:http";
+import { startupFailureMessage } from "./startupErrors.js";
 import { createApp } from "./app.js";
 import { loadConfig } from "./config.js";
 import { connectDB, disconnectDB } from "./db.js";
+import { assertFrontendBuild } from "./publicFrontend.js";
 
 let server;
 let stopping = false;
+let startupStage = "configuration";
 
 async function shutdown(exitCode = 0) {
   if (stopping) {
@@ -37,14 +40,21 @@ async function shutdown(exitCode = 0) {
 
 async function main() {
   const config = loadConfig();
+  if (config.nodeEnv === "production") {
+    startupStage = "application";
+    assertFrontendBuild();
+  }
+  startupStage = "database";
   await connectDB(config.databaseUri);
   if (stopping) {
     await disconnectDB();
     return;
   }
-  server = http.createServer(createApp());
+  startupStage = "application";
+  server = http.createServer(createApp(config));
   server.requestTimeout = 30000;
   server.headersTimeout = 15000;
+  startupStage = "http";
   let startupError;
   await new Promise((resolve, reject) => {
     startupError = reject;
@@ -56,8 +66,8 @@ async function main() {
     console.error("HTTP server failure");
     void shutdown(1);
   });
-  process.once("SIGINT", () => void shutdown());
-  process.once("SIGTERM", () => void shutdown());
+  process.once("SIGINT", () => void shutdown()); // ctl + c
+  process.once("SIGTERM", () => void shutdown()); // when any other programs or OS send stop signal
   if (!stopping) console.log(`Backend listening on port ${config.port}`);
 }
 
@@ -69,9 +79,7 @@ process.once("unhandledRejection", () => {
   console.error("Unhandled asynchronous failure");
   void shutdown(1);
 });
-main().catch(async () => {
-  console.error(
-    "Startup failed. Check configuration, database availability, and port availability.",
-  );
+main().catch(async (error) => {
+  console.error(startupFailureMessage(startupStage, error));
   await shutdown(1);
 });
