@@ -35,10 +35,12 @@ export const loginPasswordSchema = z
 
 const passwordSchema = loginPasswordSchema
   .refine(
-    (value) => [...value].length >= 15,
-    "Password must have at least 15 characters",
+    (value) => [...value].length >= 10,
+    "Password must have at least 10 characters",
   )
-  .refine((value) => /\S/u.test(value), "Password must not be only whitespace");
+  .refine((value) => /\p{Lu}/u.test(value), "Password must contain an uppercase letter")
+  .refine((value) => /\p{Ll}/u.test(value), "Password must contain a lowercase letter")
+  .refine((value) => /[\p{P}\p{S}]/u.test(value), "Password must contain a special character");
 
 // Reject unknown fields instead of silently accepting client-supplied account metadata.
 export const signupSchema = z.strictObject({

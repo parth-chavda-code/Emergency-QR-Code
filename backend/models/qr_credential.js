@@ -48,5 +48,10 @@ qrSchema.index(
   },
 );
 qrSchema.index({ profileId: 1, createdAt: -1 });
+qrSchema.index({ profileId: 1 }, {
+  unique: true,
+  partialFilterExpression: { state: "pending" },
+  name: "one_pending_qr_per_profile",
+});
 
 export const qrCredentialModel = mongoose.model("QrCredential", qrSchema);

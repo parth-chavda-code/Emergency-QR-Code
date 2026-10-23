@@ -32,6 +32,7 @@ export function prepareProfileStorage(profileId, input, key) {
       category !== "age" &&
       sharingConsent[category] &&
       privateData[category] !== undefined
+      && (category !== "additionalInformation" || privateData[category].length > 0)
     ) {
       publicData[category] = privateData[category];
     }
@@ -53,8 +54,15 @@ export function prepareProfileStorage(profileId, input, key) {
 
 // Owner-only read: validates decrypted contents before an explicit response is built.
 export function readPrivateProfile(profile, key) {
-  const privateData = decryptJson(profile.privatePayload, key, profileContext(profile._id, "private"));
-  return profileSchema.parse({ ...privateData, sharingConsent: profile.sharingConsent });
+  const privateData = decryptJson(
+    profile.privatePayload,
+    key,
+    profileContext(profile._id, "private"),
+  );
+  return profileSchema.parse({
+    ...privateData,
+    sharingConsent: profile.sharingConsent,
+  });
 }
 
 export function readPublicSnapshot(profile, key, today = new Date()) {
@@ -69,6 +77,7 @@ export function readPublicSnapshot(profile, key, today = new Date()) {
       category !== "age" &&
       profile.sharingConsent[category] &&
       Object.hasOwn(publicData, category)
+      && (category !== "additionalInformation" || publicData[category] !== "")
     ) {
       result[category] = publicData[category];
     }

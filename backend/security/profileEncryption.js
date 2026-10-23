@@ -34,7 +34,7 @@ export function encryptJson(value, key, context) {
   }
   const iv = randomBytes(12); //random 12 bytes
   const cipher = createCipheriv("aes-256-gcm", keyBytes, iv, {
-    // keyBytes = encryption key in bytes
+    // keyBytes = encryption key in bytes, AES-256-GCM requires a 256-bit key (32 bytes) that's why we convert keyBytes into 32 bytes
     authTagLength: 16,
   });
   // Bind ciphertext to its profile and purpose; copied/swapped envelopes fail.

@@ -47,6 +47,10 @@ const profileSchema = new Schema(
       required: true,
       default: () => consentSchema.parse({}),
     },
+    // Serializes QR actions against each other and against profile edits.
+    qrChangeVersion: {
+      type: Number, default: 0, min: 0, validate: Number.isSafeInteger, select: false,
+    },
     revision: {
       type: Number,
       required: true,

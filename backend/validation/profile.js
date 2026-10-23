@@ -8,6 +8,7 @@ export const sharingCategories = [
   "allergies",
   "medicalCondition",
   "medications",
+  "additionalInformation",
   "emergencyContact",
 ];
 
@@ -38,6 +39,11 @@ const medicalText = z
     (value) => !/\p{Cc}/u.test(value),
     "Control characters are not allowed",
   );
+// Free text may contain line breaks/tabs, but not other control characters.
+const additionalInformationSchema = z.string().trim().max(1000).refine(
+  value => !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/u.test(value),
+  "Control characters are not allowed",
+);
 const medicalList = z.array(medicalText).max(30).default([]); // contains array and must follow z rules of medical text, max 30 is max total array length
 const contactSchema = z.strictObject({
   name: nameSchema,
@@ -64,6 +70,7 @@ export const profileSchema = z
     allergies: medicalList,
     medicalCondition: medicalList,
     medications: medicalList,
+    additionalInformation: additionalInformationSchema.default(""),
     emergencyContact: z.array(contactSchema).max(5).default([]),
     sharingConsent: consentSchema.default(() => consentSchema.parse({})),
   })
@@ -87,6 +94,7 @@ export const profileUpdateSchema = z
     allergies: medicalList.unwrap().optional(),
     medicalCondition: medicalList.unwrap().optional(),
     medications: medicalList.unwrap().optional(),
+    additionalInformation: additionalInformationSchema.optional(),
     emergencyContact: z.array(contactSchema).max(5).optional(),
     sharingConsent: z
       .strictObject(
