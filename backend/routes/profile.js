@@ -6,8 +6,16 @@ import { authUser } from "../middlewares/authMiddleware.js";
 import { isDatabaseFailure } from "../security/authSessions.js";
 import { profileSchema, profileUpdateSchema } from "../validation/profile.js";
 import { prepareProfileStorage, readPrivateProfile } from "../security/profileStorage.js";
+import { publicPreview } from "../security/qrCredentials.js";
+import { qrFailure } from "./qr.js";
 
 const profileRouter = Router();
+
+profileRouter.get("/public-preview", authUser, async (req, res, next) => {
+  try {
+    return res.status(200).json(await publicPreview(req.userId, req.app.locals.profileEncryptionKey));
+  } catch (err) { return qrFailure(err, res, next); }
+});
 
 function ownerResponse(profile, key) {
   return { profile: {
