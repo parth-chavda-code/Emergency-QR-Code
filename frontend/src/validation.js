@@ -1,5 +1,15 @@
 const passwordBytes = value => new TextEncoder().encode(value).length;
 
+export function signupPasswordChecks(password) {
+  return {
+    length: [...password].length >= 10,
+    uppercase: /\p{Lu}/u.test(password),
+    lowercase: /\p{Ll}/u.test(password),
+    special: /[\p{P}\p{S}]/u.test(password),
+    bytes: passwordBytes(password) <= 72,
+  };
+}
+
 function validateEmail(value) {
   const email = value.trim();
   if (!email) return "Enter your email address.";
@@ -23,8 +33,8 @@ export function validateSignup(values) {
     if (!name) errors[field] = `Enter your ${field === "firstName" ? "first" : "last"} name.`;
     else if ([...name].length > 100 || /\p{Cc}/u.test(name)) errors[field] = "Use 1–100 characters without control characters.";
   }
-  if (!errors.password && ([...values.password].length < 15 || !/\S/u.test(values.password))) {
-    errors.password = "Use at least 15 characters, with something other than spaces.";
+  if (!errors.password && !Object.values(signupPasswordChecks(values.password)).every(Boolean)) {
+    errors.password = "Use at least 10 characters, including an uppercase letter, a lowercase letter, and a special character.";
   }
   if (!values.confirmPassword) errors.confirmPassword = "Enter your password again.";
   else if (values.confirmPassword !== values.password) errors.confirmPassword = "The passwords don't match.";
