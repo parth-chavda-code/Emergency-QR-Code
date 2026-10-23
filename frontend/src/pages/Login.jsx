@@ -57,7 +57,7 @@ export default function Login({ email = "", notice, onSuccess }) {
             <h1 id="login-title" className="font-heading text-3xl font-bold tracking-tight">Welcome back</h1></div>
         </div>
         <p className="mb-7 text-base text-secondary">Sign in to manage your emergency profile.</p>
-        {notice && <p role="status" className="mb-5 border-l-3 border-success bg-success/7 p-4 text-sm text-success">{notice}</p>}
+        {notice && <p role="status" className="mb-5 border-l-3 border-success bg-success/7 p-4 text-base text-success">{notice}</p>}
         <form onSubmit={submit} noValidate aria-busy={pending} className="flex flex-col gap-5">
           <fieldset disabled={pending} className="contents">
             <FormField label="Email" name="email" type="email" value={values.email} onChange={change}
@@ -72,15 +72,15 @@ export default function Login({ email = "", notice, onSuccess }) {
           </fieldset>
         </form>
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3 bg-wash p-4">
-          <p className="text-sm text-secondary">New to Emergency QR?</p>
+          <p className="text-base text-secondary">New to Emergency QR?</p>
           <a href="#/signup" className="text-link">Create an account <span aria-hidden="true">→</span></a>
         </div>
-        <div className="mt-6 flex items-start gap-2 text-sm leading-5 text-secondary">
+        <div className="mt-6 flex items-start gap-2 text-base leading-5 text-secondary">
           <Icon name="info" className="mt-0.5 h-4 w-4" />
           <p>Scanning someone’s QR? You don’t need an account to view the information they’ve chosen to share.</p>
         </div>
       </div>
     </section>
-    <p className="mt-5 flex items-center justify-center gap-2 text-xs text-secondary"><Icon name="shield" className="h-4 w-4 text-success" />Private by default. Shared on your terms.</p>
+    <p className="mt-5 flex items-center justify-center gap-2 text-sm text-secondary"><Icon name="shield" className="h-4 w-4 text-success" />Private by default. Shared on your terms.</p>
   </div>;
 }

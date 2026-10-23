@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { signup } from "../api.js";
-import { validateSignup } from "../validation.js";
+import { signupPasswordChecks, validateSignup } from "../validation.js";
 import FormField from "../components/FormField.jsx";
 import Icon from "../components/Icon.jsx";
 
@@ -10,8 +10,18 @@ const privacyNotes = [
   ["refresh", "You stay in control", "Change your sharing choices anytime. Revoke or replace your QR when you need to."],
 ];
 
+const passwordRequirements = [
+  ["length", "At least 10 characters"],
+  ["uppercase", "One uppercase letter"],
+  ["lowercase", "One lowercase letter"],
+  ["special", "One special character (e.g. ! or @)"],
+  ["bytes", "No more than 72 bytes"],
+];
+
 export default function Signup({ onSuccess }) {
   const [values, setValues] = useState({ firstName: "", lastName: "", email: "", password: "", confirmPassword: "" });
+  const passwordChecks = signupPasswordChecks(values.password);
+  const completedRequirements = values.password ? Object.values(passwordChecks).filter(Boolean).length : 0;
   const [errors, setErrors] = useState({});
   const [failure, setFailure] = useState("");
   const [pending, setPending] = useState(false);
@@ -70,15 +80,15 @@ export default function Signup({ onSuccess }) {
           </div>
           <div className="flex flex-col gap-3">
             {privacyNotes.map(([icon, title, description]) => <div key={title} className="flex items-start gap-3 bg-white p-4">
-              <Icon name={icon} className="mt-0.5 text-success" /><div><h3 className="font-heading text-sm font-bold">{title}</h3>
-                <p className="mt-1.5 text-sm leading-6 text-secondary">{description}</p></div>
+              <Icon name={icon} className="mt-0.5 text-success" /><div><h3 className="font-heading text-lg font-bold">{title}</h3>
+                <p className="mt-1.5 text-base leading-6 text-secondary">{description}</p></div>
             </div>)}
           </div>
         </div>
         <div className="mt-5 flex items-start gap-3 bg-ink p-5 text-white">
           <Icon name="qr" className="mt-1 text-green-300" /><div>
-            <h3 className="font-heading text-sm font-bold">A simpler way to share</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-200">An active QR lets others read your shared emergency information without signing in. An internet connection is needed.</p>
+            <h3 className="font-heading text-lg font-bold">A simpler way to share</h3>
+            <p className="mt-2 text-base leading-6 text-slate-200">An active QR lets others read your shared emergency information without signing in. An internet connection is needed.</p>
           </div>
         </div>
       </aside>
@@ -86,7 +96,7 @@ export default function Signup({ onSuccess }) {
         <div className="status-strip"><span>ACCOUNT DETAILS</span><span className="flex items-center gap-1.5"><Icon name="lock" className="h-3 w-3" />PRIVATE SIGNUP</span></div>
         <div className="p-6 sm:p-8">
           <h2 id="signup-title" className="font-heading text-xl font-bold">Start with the essentials</h2>
-          <p className="mb-7 mt-2 text-sm leading-6 text-secondary">Create your account first. Your emergency profile comes next.</p>
+          <p className="mb-7 mt-2 text-base leading-6 text-secondary">Create your account first. Your emergency profile comes next.</p>
           <form onSubmit={submit} noValidate aria-busy={pending} className="flex flex-col gap-5">
             <fieldset disabled={pending} className="contents">
               <div className="grid gap-5 sm:grid-cols-2">
@@ -98,9 +108,23 @@ export default function Signup({ onSuccess }) {
               <FormField label="Email" name="email" type="email" value={values.email} onChange={change}
                 error={errors.email} autoComplete="username" autoCapitalize="none" spellCheck={false}
                 placeholder="you@example.com" maxLength={254} icon="mail" />
-              <FormField label="Password" name="password" type="password" value={values.password} onChange={change}
-                error={errors.password} autoComplete="new-password" placeholder="Create a long, unique password"
-                hint="Use at least 15 characters and at most 72 bytes. Some characters use more than one byte. A long, unique passphrase works well; no uppercase, number, or symbol is required." />
+              <div>
+                <FormField label="Password" name="password" type="password" value={values.password} onChange={change}
+                  error={errors.password} autoComplete="new-password" placeholder="Create a long, unique password"
+                  aria-describedby={["password-requirements", errors.password && "password-error"].filter(Boolean).join(" ")} />
+                <ul id="password-requirements" aria-label="Password requirements" className="mt-3 grid gap-2 text-sm">
+                  {passwordRequirements.map(([key, label]) => {
+                    const met = Boolean(values.password) && passwordChecks[key];
+                    return <li key={key} className={`flex items-center gap-2 ${met ? "text-success" : "text-secondary"}`}>
+                      <span aria-hidden="true" className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${met ? "border-current bg-green-50" : "border-line"}`}>
+                        {met && <Icon name="check" className="h-3 w-3" />}
+                      </span>
+                      <span><span className="sr-only">{met ? "Met: " : "Not met: "}</span>{label}</span>
+                    </li>;
+                  })}
+                </ul>
+                <p role="status" className="sr-only">{completedRequirements} of {passwordRequirements.length} password requirements met.</p>
+              </div>
               <FormField label="Confirm password" name="confirmPassword" type="password" value={values.confirmPassword} onChange={change}
                 error={errors.confirmPassword} autoComplete="new-password" placeholder="Enter your password again" />
               {failure && <p role="alert" ref={messageRef} tabIndex={-1} className="form-alert">{failure}</p>}
@@ -109,8 +133,8 @@ export default function Signup({ onSuccess }) {
               </button>
             </fieldset>
           </form>
-          <p className="mt-6 text-center text-sm text-secondary">Already have an account? <a href="#/login" className="text-link ml-1">Sign in</a></p>
-          <div className="mt-6 flex items-start gap-2 border-t border-line pt-5 text-xs leading-5 text-secondary">
+          <p className="mt-6 text-center text-base text-secondary">Already have an account? <a href="#/login" className="text-link ml-1">Sign in</a></p>
+          <div className="mt-6 flex items-start gap-2 border-t border-line pt-5 text-sm leading-5 text-secondary">
             <Icon name="lock" className="mt-0.5 h-4 w-4 text-success" /><p>Creating an account does not make your emergency information public. You choose what to share when setting up your profile.</p>
           </div>
         </div>
