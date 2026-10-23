@@ -1,17 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateLogin, validateSignup } from "../src/validation.js";
+import { signupPasswordChecks, validateLogin, validateSignup } from "../src/validation.js";
 import { signup, login, ApiError } from "../src/api.js";
 
 const values = { firstName: "Priya", lastName: "Sharma", email: "priya@example.com",
-  password: "a long unique passphrase", confirmPassword: "a long unique passphrase" };
+  password: "A long unique passphrase!", confirmPassword: "A long unique passphrase!" };
+
+test("password checklist updates individual requirements and Unicode byte limits", () => {
+  assert.deepEqual(signupPasswordChecks("abc"), {
+    length: false, uppercase: false, lowercase: true, special: false, bytes: true,
+  });
+  assert.ok(Object.values(signupPasswordChecks("Abcdefghi!")).every(Boolean));
+  assert.equal(signupPasswordChecks("abcdefghi!").uppercase, false);
+  assert.equal(signupPasswordChecks("Abcdefghi ").special, false);
+  assert.equal(signupPasswordChecks("Aa!" + "😀".repeat(17) + "a").bytes, true);
+  assert.equal(signupPasswordChecks("Aa!" + "😀".repeat(18)).bytes, false);
+  assert.equal(signupPasswordChecks("Aa!" + "😀".repeat(6)).length, false);
+});
 
 test("signup handles Unicode character/byte boundaries and matching passwords", () => {
   assert.deepEqual(validateSignup(values), {});
-  for (const password of ["a".repeat(15), "a".repeat(72), "界".repeat(24), "😀".repeat(18)]) {
+  for (const password of ["Aa!" + "a".repeat(7), "Aa!" + "a".repeat(69), "Aa!" + "界".repeat(23), "Aa!" + "😀".repeat(17) + "a", "Ää!" + "a".repeat(7)]) {
     assert.deepEqual(validateSignup({ ...values, password, confirmPassword: password }), {});
   }
-  for (const password of ["a".repeat(14), "a".repeat(73), "界".repeat(25), "😀".repeat(19), " ".repeat(15)]) {
+  for (const password of ["Aa!" + "a".repeat(6), "Aa!" + "a".repeat(70), "Aa!" + "界".repeat(24), "Aa!" + "😀".repeat(18), " ".repeat(10),
+    "lowercase!password", "UPPERCASE!PASSWORD", "Upperlower123", "Upper lower123"]) {
     assert.ok(validateSignup({ ...values, password, confirmPassword: password }).password);
   }
   assert.ok(validateSignup({ ...values, confirmPassword: "different" }).confirmPassword);
@@ -36,14 +49,14 @@ test("login accepts short and whitespace passwords but enforces the byte limit",
 
 test("signup sends only account fields and preserves the exact password", async t => {
   let sent;
-  const password = "  a long unique passphrase  ";
+  const password = "  A long unique passphrase!  ";
   t.mock.method(globalThis, "fetch", async (url, options) => {
     sent = { url, options };
     return Response.json({ user: { firstName: "Priya", email: "priya@example.com" } }, { status: 201 });
   });
   await signup({ ...values, firstName: " Priya ", email: " PRIYA@EXAMPLE.COM ", password,
     confirmPassword: password, dob: "1990-01-01", isAdmin: true });
-  assert.equal(sent.url, "/api/user/signup");
+  assert.equal(sent.url, "/user/signup");
   assert.equal(sent.options.credentials, "omit");
   assert.equal(sent.options.cache, "no-store");
   assert.deepEqual(JSON.parse(sent.options.body), { firstName: "Priya", lastName: "Sharma",
@@ -58,7 +71,7 @@ test("login sends credentials without trimming passwords and accepts the existin
       token: "test-only-token", tokenType: "Bearer", expiresIn: 900 });
   });
   const data = await login({ email: " PRIYA@EXAMPLE.COM ", password: " ", extra: "ignored" });
-  assert.equal(sent.url, "/api/user/login");
+  assert.equal(sent.url, "/user/login");
   assert.deepEqual(JSON.parse(sent.options.body), { email: "priya@example.com", password: " " });
   assert.equal(data.token, "test-only-token");
 });
