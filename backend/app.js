@@ -5,12 +5,14 @@ import { profileRouter } from "./routes/profile.js";
 import { qrRouter } from "./routes/qr.js";
 import { createPublicEmergencyRouter } from "./routes/publicEmergency.js";
 import { mountPublicFrontend } from "./publicFrontend.js";
+import { proxyDiagnostics } from "./middlewares/proxyDiagnostics.js";
 
-export function createApp({ jwtSecret, profileEncryptionKey, publicBaseUrl, trustProxyHops = 0 } = {}) {
+export function createApp({ jwtSecret, profileEncryptionKey, publicBaseUrl, trustProxyHops = 0, proxyDiagnosticsKey } = {}) {
   const app = express();
   app.disable("x-powered-by");
   // Enable only for a deployment whose immediate upstream proxy is trusted.
   app.set("trust proxy", trustProxyHops);
+  if (proxyDiagnosticsKey) app.use(proxyDiagnostics(proxyDiagnosticsKey));
   app.locals.jwtSecret = jwtSecret;
   app.locals.profileEncryptionKey = profileEncryptionKey;
   app.locals.publicBaseUrl = publicBaseUrl;
