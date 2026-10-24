@@ -61,7 +61,7 @@ Copy the environment file only on first setup; keep an existing `.env`.
 | `JWT_SECRET` | Random secret of at least 32 bytes |
 | `PROFILE_ENCRYPTION_KEY` | Separate 32-byte key encoded as 64 hexadecimal characters |
 | `PUBLIC_BASE_URL` | Website origin used in QR links; production requires HTTPS |
-| `TRUST_PROXY_HOPS` | `0` locally; observed Render staging path uses `3` (verify after deployment) |
+| `TRUST_PROXY_HOPS` | `0` locally; hosted staging path verified with `3` |
 
 Generate each secret separately with:
 
@@ -205,14 +205,6 @@ verify Atlas access, HTTPS, domain routing, rate limits, and phone scanning.
 Changing domains does not update URLs already printed in QR stickers.
 
 ## Troubleshooting
-
-Temporary proxy diagnostics: set a fresh, separate 64-character lowercase hex
-`PROXY_DIAGNOSTICS_KEY` on staging. Only `POST /user/login` requests carrying the
-matching `X-Proxy-Diagnostic-Key` header log connection addresses, up to six records
-per application instance. Ordinary traffic is not logged. Passwords, tokens,
-request bodies, URLs, and the diagnostic key are excluded. This does not change
-rate limits or add an endpoint. Remove the variable and redeploy after diagnosis;
-do not reuse an application secret or commit the diagnostic key.
 
 - **Frontend connection refused:** check that the backend started on port `3000`.
 - **Database startup error:** confirm MongoDB is running and the URI uses the correct port and replica-set name.

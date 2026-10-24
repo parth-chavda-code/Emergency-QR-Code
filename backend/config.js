@@ -38,11 +38,6 @@ export function validateConfig(env) {
   if (!["0", "1", "2", "3"].includes(proxyText)) {
     throw new Error("TRUST_PROXY_HOPS must be an integer from 0 to 3 matching the verified upstream proxy path");
   }
-  const proxyDiagnosticsKey = env.PROXY_DIAGNOSTICS_KEY;
-  if (proxyDiagnosticsKey !== undefined && proxyDiagnosticsKey !== ""
-    && (typeof proxyDiagnosticsKey !== "string" || !/^[a-f0-9]{64}$/.test(proxyDiagnosticsKey))) {
-    throw new Error("PROXY_DIAGNOSTICS_KEY must be empty or a separate random 64-character lowercase hexadecimal key");
-  }
   const jwtSecret = env.JWT_SECRET;
   if (
     typeof jwtSecret !== "string" ||
@@ -59,9 +54,6 @@ export function validateConfig(env) {
   if (profileEncryptionKey === jwtSecret) {
     throw new Error("PROFILE_ENCRYPTION_KEY must be different from JWT_SECRET");
   }
-  if (proxyDiagnosticsKey && [jwtSecret, profileEncryptionKey].includes(proxyDiagnosticsKey)) {
-    throw new Error("PROXY_DIAGNOSTICS_KEY must be different from application secrets");
-  }
   const publicBaseUrl = validatePublicBaseUrl(env.PUBLIC_BASE_URL
     ?? (nodeEnv === "production" ? undefined : `http://localhost:${port}`), nodeEnv);
   return Object.freeze({
@@ -72,7 +64,6 @@ export function validateConfig(env) {
     jwtSecret,
     profileEncryptionKey,
     publicBaseUrl,
-    ...(proxyDiagnosticsKey ? { proxyDiagnosticsKey } : {}),
   });
 }
 
