@@ -10,7 +10,7 @@ import { proxyDiagnostics } from "./middlewares/proxyDiagnostics.js";
 export function createApp({ jwtSecret, profileEncryptionKey, publicBaseUrl, trustProxyHops = 0, proxyDiagnosticsKey } = {}) {
   const app = express();
   app.disable("x-powered-by");
-  // Enable only for a deployment whose immediate upstream proxy is trusted.
+  // The hop count must match the verified forwarding path; keep 0 for direct access.
   app.set("trust proxy", trustProxyHops);
   if (proxyDiagnosticsKey) app.use(proxyDiagnostics(proxyDiagnosticsKey));
   app.locals.jwtSecret = jwtSecret;

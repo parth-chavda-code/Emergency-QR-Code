@@ -5,6 +5,7 @@ import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { createApp } from "../backend/app.js";
 import { assertFrontendBuild } from "../backend/publicFrontend.js";
+import { validateConfig } from "../backend/config.js";
 
 test("public QR browser navigation serves a private-data-free shell; JSON retains existing unavailable behavior", async t => {
   const server = http.createServer(createApp());
@@ -79,3 +80,40 @@ test("one trusted proxy keeps rate limits per rightmost client address and ignor
   assert.equal((await attempt("198.51.100.99, 203.0.113.1")).status, 429);
   assert.equal((await attempt("203.0.113.2")).status, 400);
 });
+
+for (const [family, visitor, otherVisitor] of [
+  ["IPv4", "203.0.113.10", "203.0.113.11"],
+  ["IPv6", "2001:db8:1234::1", "2001:db8:5678::1"],
+]) {
+  test(`observed three-hop Render path limits the original ${family} visitor despite changing proxies and fake headers`, async t => {
+    const config = validateConfig({ dbconnection: "mongodb://127.0.0.1:1/disposable",
+      JWT_SECRET: "synthetic-proxy-test-secret-at-least-32-bytes",
+      PROFILE_ENCRYPTION_KEY: "ab".repeat(32), TRUST_PROXY_HOPS: "3" });
+    const app = createApp(config);
+    assert.equal(app.get("trust proxy"), 3);
+    const server = http.createServer(app);
+    server.listen(0, "127.0.0.1"); await once(server, "listening");
+    t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const attempt = (client, i, spoof = false) => fetch(base + "/user/login", { method: "POST",
+      headers: { "Content-Type": "application/json",
+        "X-Forwarded-For": `${spoof ? `198.51.100.${i + 1}, ` : ""}${client}, 172.71.${i % 2 ? "202.82" : "124.85"}, ${i % 2 ? "10.27.188.5" : "10.29.8.12"}`,
+        "CF-Connecting-IP": `198.51.100.${i + 1}`, "X-Real-IP": `198.51.100.${i + 1}` }, body: "{}" });
+    let policy;
+    for (let i = 0; i < 10; i++) {
+      const response = await attempt(visitor, i, i % 2 === 1);
+      assert.equal(response.status, 400);
+      const partition = /pk=:([^:]+):/.exec(response.headers.get("ratelimit-policy"))?.[1];
+      assert.ok(partition);
+      if (i === 0) policy = partition;
+      else assert.equal(partition, policy, "changing proxies and spoofed headers must not change the visitor counter");
+      assert.match(response.headers.get("ratelimit"), new RegExp(`r=${9 - i};`));
+    }
+    const blocked = await attempt(visitor, 10, true);
+    assert.equal(blocked.status, 429);
+    assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+    assert.deepEqual(await blocked.json(), { error: "Too many login attempts. Please try again later." });
+    assert.equal((await attempt(visitor, 11)).status, 429);
+    assert.equal((await attempt(otherVisitor, 12, true)).status, 400, "a different visitor keeps a separate allowance");
+  });
+}

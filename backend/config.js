@@ -35,8 +35,8 @@ export function validateConfig(env) {
     throw new Error("NODE_ENV must be development, test, or production");
   }
   const proxyText = env.TRUST_PROXY_HOPS ?? "0";
-  if (!["0", "1"].includes(proxyText)) {
-    throw new Error("TRUST_PROXY_HOPS must be 0 (direct) or 1 (one trusted upstream proxy)");
+  if (!["0", "1", "2", "3"].includes(proxyText)) {
+    throw new Error("TRUST_PROXY_HOPS must be an integer from 0 to 3 matching the verified upstream proxy path");
   }
   const proxyDiagnosticsKey = env.PROXY_DIAGNOSTICS_KEY;
   if (proxyDiagnosticsKey !== undefined && proxyDiagnosticsKey !== ""

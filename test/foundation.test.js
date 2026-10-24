@@ -93,8 +93,10 @@ test("configuration defaults and invalid values", () => {
     assert.throws(() => validateConfig({ ...base, PORT }));
   }
   assert.throws(() => validateConfig({ ...base, NODE_ENV: "invalid" }));
-  assert.equal(validateConfig({ ...base, TRUST_PROXY_HOPS: "1" }).trustProxyHops, 1);
-  for (const TRUST_PROXY_HOPS of ["", "true", "2", "-1", " 1"]) {
+  for (const TRUST_PROXY_HOPS of ["0", "1", "2", "3"]) {
+    assert.equal(validateConfig({ ...base, TRUST_PROXY_HOPS }).trustProxyHops, Number(TRUST_PROXY_HOPS));
+  }
+  for (const TRUST_PROXY_HOPS of ["", "true", "4", "-1", " 1", "1 ", "3.0", "03", "1e0"]) {
     assert.throws(() => validateConfig({ ...base, TRUST_PROXY_HOPS }), /TRUST_PROXY_HOPS/);
   }
   for (const JWT_SECRET of [undefined, "", "short", " ".repeat(32)]) {

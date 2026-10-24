@@ -61,7 +61,7 @@ Copy the environment file only on first setup; keep an existing `.env`.
 | `JWT_SECRET` | Random secret of at least 32 bytes |
 | `PROFILE_ENCRYPTION_KEY` | Separate 32-byte key encoded as 64 hexadecimal characters |
 | `PUBLIC_BASE_URL` | Website origin used in QR links; production requires HTTPS |
-| `TRUST_PROXY_HOPS` | `0` locally; `1` only behind a verified trusted upstream proxy |
+| `TRUST_PROXY_HOPS` | `0` locally; observed Render staging path uses `3` (verify after deployment) |
 
 Generate each secret separately with:
 
@@ -179,7 +179,13 @@ Planned setup: **one Render Web Service + MongoDB Atlas**, using synthetic data 
 Set the environment variables above privately in Render. Use a separate Atlas
 database named `emergency_qr_staging`, fresh staging secrets, and an HTTPS
 `PUBLIC_BASE_URL`. Let Render supply `PORT`. Verify trusted proxy forwarding and
-rate limiting before opening staging for testing. Render Free can sleep after
+rate limiting before opening staging for testing. The observed staging path is
+visitor → Cloudflare → Render internal proxy → local forwarding connection → Express.
+Set `TRUST_PROXY_HOPS=3` only after deploying code that accepts it. Verify both the
+custom and `.onrender.com` addresses select the original visitor and reject fake
+prepended addresses. This count must be rechecked if the forwarding path changes;
+do not use it for a directly accessible server or set unrestricted proxy trust.
+Render Free can sleep after
 inactivity and is intended here for testing, not live emergency reliance.
 
 To seed fictional profiles, provide `STAGING_MONGODB_URI`,
